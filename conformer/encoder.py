@@ -79,12 +79,10 @@ class ConformerBlock(nn.Module):
             ),
             module_factor=self.feed_forward_residual_factor,
         )
-        self.attn = ResidualConnectionModule(
-            module=MultiHeadedSelfAttentionModule(
-                d_model=encoder_dim,
-                num_heads=num_attention_heads,
-                dropout_p=attention_dropout_p,
-            ),
+        self.attn = MultiHeadedSelfAttentionModule(
+            d_model=encoder_dim,
+            num_heads=num_attention_heads,
+            dropout_p=attention_dropout_p,
         )
         self.conv = ResidualConnectionModule(
             module=ConformerConvModule(
@@ -106,7 +104,7 @@ class ConformerBlock(nn.Module):
 
     def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
         x = self.ff1(x)
-        x = self.attn(x, mask=mask)
+        x = self.attn(x, mask=mask) + x
         x = self.conv(x)
         x = self.ff2(x)
         x = self.post_norm(x)
