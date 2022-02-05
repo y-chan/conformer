@@ -71,43 +71,46 @@ class ConformerBlock(nn.Module):
         else:
             self.feed_forward_residual_factor = 1
 
-        self.sequential = nn.Sequential(
-            ResidualConnectionModule(
-                module=FeedForwardModule(
-                    encoder_dim=encoder_dim,
-                    expansion_factor=feed_forward_expansion_factor,
-                    dropout_p=feed_forward_dropout_p,
-                ),
-                module_factor=self.feed_forward_residual_factor,
+        self.ff1 = ResidualConnectionModule(
+            module=FeedForwardModule(
+                encoder_dim=encoder_dim,
+                expansion_factor=feed_forward_expansion_factor,
+                dropout_p=feed_forward_dropout_p,
             ),
-            ResidualConnectionModule(
-                module=MultiHeadedSelfAttentionModule(
-                    d_model=encoder_dim,
-                    num_heads=num_attention_heads,
-                    dropout_p=attention_dropout_p,
-                ),
-            ),
-            ResidualConnectionModule(
-                module=ConformerConvModule(
-                    in_channels=encoder_dim,
-                    kernel_size=conv_kernel_size,
-                    expansion_factor=conv_expansion_factor,
-                    dropout_p=conv_dropout_p,
-                ),
-            ),
-            ResidualConnectionModule(
-                module=FeedForwardModule(
-                    encoder_dim=encoder_dim,
-                    expansion_factor=feed_forward_expansion_factor,
-                    dropout_p=feed_forward_dropout_p,
-                ),
-                module_factor=self.feed_forward_residual_factor,
-            ),
-            nn.LayerNorm(encoder_dim),
+            module_factor=self.feed_forward_residual_factor,
         )
+        self.attn = ResidualConnectionModule(
+            module=MultiHeadedSelfAttentionModule(
+                d_model=encoder_dim,
+                num_heads=num_attention_heads,
+                dropout_p=attention_dropout_p,
+            ),
+        )
+        self.conv = ResidualConnectionModule(
+            module=ConformerConvModule(
+                in_channels=encoder_dim,
+                kernel_size=conv_kernel_size,
+                expansion_factor=conv_expansion_factor,
+                dropout_p=conv_dropout_p,
+            ),
+        )
+        self.ff2 = ResidualConnectionModule(
+            module=FeedForwardModule(
+                encoder_dim=encoder_dim,
+                expansion_factor=feed_forward_expansion_factor,
+                dropout_p=feed_forward_dropout_p,
+            ),
+            module_factor=self.feed_forward_residual_factor,
+        )
+        self.post_norm = nn.LayerNorm(encoder_dim)
 
-    def forward(self, inputs: Tensor) -> Tensor:
-        return self.sequential(inputs)
+    def forward(self, x: Tensor, mask: Optional[Tensor] = None) -> Tensor:
+        x = self.ff1(x)
+        x = self.attn(x, mask=mask)
+        x = self.conv(x)
+        x = self.ff2(x)
+        x = self.post_norm(x)
+        return x
 
 
 class ConformerEncoder(nn.Module):
